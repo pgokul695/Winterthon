@@ -10,8 +10,8 @@ if (GOOGLE_API_KEY) {
 
 export function getGeminiModels(): string[] {
   return [
-    // Gemini 2.5 Series (Latest)
-    "gemini-2.5-flash",      // Gemini 2.5 Flash - RECOMMENDED DEFAULT
+    // Gemini 2.5 Series (Latest) 
+    "gemini-2.5-flash",      // Gemini 2.5 Flash - DEFAULT
     "gemini-2.5-pro",        // Gemini 2.5 Pro
     "gemini-2.5-flash-lite", // Gemini 2.5 Flash-Lite
     

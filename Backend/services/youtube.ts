@@ -74,7 +74,7 @@ async function fetchVideoInfo(videoId: string): Promise<VideoInfo> {
 }
 
 /**
- * Fetch video metadata from YouTube (fallback method)
+ * Fetch video metadata from YouTube (fallback method) [Only if Subtitles fails and Whisper fails]
  */
 async function fetchVideoMetadata(videoId: string): Promise<VideoInfo> {
   try {
@@ -180,8 +180,9 @@ async function generateCaptionsWithLocalWhisper(videoId: string, startTime?: num
     
     try {
       // Try using openai-whisper Python package (most common)
+      // Force CPU usage to avoid CUDA out of memory errors
       const { stdout, stderr } = await execAsync(
-        `whisper "${audioPath}" --model tiny --output_dir "${tempDir}" --output_format txt --language en`,
+        `CUDA_VISIBLE_DEVICES="" whisper "${audioPath}" --model tiny --output_dir "${tempDir}" --output_format txt --language en --device cpu`,
         { maxBuffer: 10 * 1024 * 1024 } // 10MB buffer
       );
       

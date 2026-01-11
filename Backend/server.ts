@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
 
 // Load environment variables FIRST before importing any services
 dotenv.config();
@@ -24,16 +25,39 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 9006;
 
-// CORS configuration - Allow all origins for testing
+// CORS configuration - Allow production and local origins
+const allowedOrigins = [
+  'https://mindcue.gokulp.online',
+  'https://mindcueb.gokulp.online',
+  'http://localhost:9007',
+  'http://localhost:9008',
+  'http://localhost:5173',
+  'http://127.0.0.1:9007',
+  'http://127.0.0.1:9008',
+  'http://127.0.0.1:5173',
+];
+
 app.use(cors({
-  origin: '*',  // Allow all origins
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('Blocked origin:', origin);
+      callback(null, true); // Still allow for now, but log
+    }
+  },
   methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 app.use(express.json({ limit: "10mb" }));
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Health check
 app.get("/", (req: Request, res: Response) => {
@@ -42,6 +66,7 @@ app.get("/", (req: Request, res: Response) => {
     message: "Question Generation API",
     endpoints: {
       health: "GET /",
+      test: "GET /test",
       ollamaModels: "GET /api/models/ollama",
       geminiModels: "GET /api/models/gemini",
       generate: "POST /api/generate",
@@ -51,6 +76,11 @@ app.get("/", (req: Request, res: Response) => {
       transcribeAndGenerate: "POST /api/transcribe-and-generate",
     },
   });
+});
+
+// Serve test page
+app.get("/test", (req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'public', 'test.html'));
 });
 
 // Get Ollama models

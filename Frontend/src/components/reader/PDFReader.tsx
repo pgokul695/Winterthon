@@ -1,92 +1,176 @@
-import React, { useEffect, useRef, useState } from "react";
-import QuestionPopup from "../quiz/QuestionPopup";
+import React, { useEffect, useState, useRef } from "react";
+import * as pdfjsLib from "pdfjs-dist";
+
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface Props {
-  onTextReady: (text: string) => void;
+  onGenerateQuestions: (text: string) => void;
+  isGenerating: boolean;
 }
 
-const PDFReader: React.FC<Props> = ({ onTextReady }) => {
-  const [text, setText] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [scrollPercent, setScrollPercent] = useState(0);
-  const [showQuestion, setShowQuestion] = useState(false);
-  const [timerId, setTimerId] = useState<NodeJS.Timeout | null>(null);
-  const [questionTriggered, setQuestionTriggered] = useState(false);
+const PDFReader: React.FC<Props> = ({ onGenerateQuestions, isGenerating }) => {
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [lastQuestionTime, setLastQuestionTime] = useState(0);
+  const [extractedText, setExtractedText] = useState<string>("");
+  const [isExtracting, setIsExtracting] = useState(false);
+  const isGeneratingRef = useRef(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleScroll = () => {
-    if (!textareaRef.current) return;
+  // Update ref whenever isGenerating prop changes
+  useEffect(() => {
+    isGeneratingRef.current = isGenerating;
+  }, [isGenerating]);
 
-    const { scrollTop, scrollHeight, clientHeight } = textareaRef.current;
-    const percent =
-      scrollHeight > clientHeight
-        ? (scrollTop / (scrollHeight - clientHeight)) * 100
-        : 0;
-    setScrollPercent(percent);
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || file.type !== "application/pdf") {
+      alert("Please upload a valid PDF file");
+      return;
+    }
+
+    setIsExtracting(true);
+    try {
+      // Extract text from PDF
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(" ");
+        fullText += pageText + "\n\n";
+      }
+
+      setExtractedText(fullText.trim());
+      
+      // Create a blob URL for the PDF to display in iframe
+      const url = URL.createObjectURL(file);
+      setPdfUrl(url);
+      
+      // Start random question generation timer
+      startQuestionTimer();
+    } catch (error) {
+      console.error("Error extracting PDF text:", error);
+      alert("Failed to extract text from PDF");
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const startQuestionTimer = () => {
+    // Clear any existing timer
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
+    // Trigger questions every 2 minutes
+    timerRef.current = setTimeout(() => {
+      // Check if still have PDF and not currently generating
+      if (pdfUrl && !isGeneratingRef.current && extractedText) {
+        const now = Date.now();
+        if (now - lastQuestionTime > 110000) { // At least 110s since last question
+          setLastQuestionTime(now); // Update immediately to prevent duplicate triggers
+          onGenerateQuestions(extractedText);
+        }
+      }
+      // Continue timer if PDF still open and not generating
+      if (pdfUrl && !isGeneratingRef.current) {
+        startQuestionTimer();
+      }
+    }, 120000); // 2 minutes
   };
 
   useEffect(() => {
-    // Only trigger if scrolled past 25% and popup hasn't been triggered yet
-    if (scrollPercent >= 25 && !questionTriggered) {
-      if (!timerId) {
-        const id = setTimeout(() => {
-          setShowQuestion(true);
-          setQuestionTriggered(true);
-        }, 5000); // 5 seconds for testing (change to 60000 for 1 min)
-        setTimerId(id);
-      }
-    }
-
-    // Reset timer if scrolled back before 25%
-    if (scrollPercent < 25 && timerId) {
-      clearTimeout(timerId);
-      setTimerId(null);
-    }
-  }, [scrollPercent, questionTriggered, timerId]);
-
-  useEffect(() => {
-    onTextReady(text);
-  }, [text]);
+    return () => {
+      // Cleanup: revoke blob URL and clear timer when component unmounts
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [pdfUrl]);
 
   return (
-    <>
-      {showQuestion && (
-        <QuestionPopup
-          showQuestion={showQuestion}
-          question={{
-            questionText: "What was the main point of the paragraph?",
-            options: ["Option A", "Option B", "Option C", "Option D"],
-          }}
-          onAnswer={() => setShowQuestion(false)}
-          onClose={() => setShowQuestion(false)} // optional close button inside popup
-        />
-      )}
-
-      <div className="w-full max-w-3xl mx-auto">
-        <h2 className="text-2xl font-semibold mb-4 text-center">
-          Read and Learn
+    <div className="w-full h-screen flex flex-col">
+      <div className="w-full max-w-6xl mx-auto flex-1 flex flex-col p-6">
+        <h2 className="text-3xl font-bold mb-6 text-gray-800">
+          📄 PDF Reader
         </h2>
 
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onScroll={handleScroll}
-          className="w-full h-[32rem] p-6 border rounded-lg overflow-y-scroll resize-none bg-white shadow-md text-lg leading-relaxed"
-          placeholder="Paste your PDF text here..."
-        />
-
-        <div className="mt-3 w-full bg-gray-200 h-2 rounded">
-          <div
-            className="bg-blue-500 h-2 rounded"
-            style={{ width: `${scrollPercent}%` }}
-          />
-        </div>
-
-        <p className="mt-1 text-sm text-gray-600 text-right">
-          Scroll progress: {Math.round(scrollPercent)}%
-        </p>
+        {!pdfUrl ? (
+          <div className="flex-1 flex items-center justify-center">
+            <label
+              htmlFor="pdf-upload"
+              className="w-full max-w-xl p-16 border-2 border-dashed border-blue-400 rounded-2xl text-center cursor-pointer hover:border-blue-600 hover:bg-blue-50 transition-all hover:scale-105 bg-white shadow-sm"
+            >
+              <input
+                id="pdf-upload"
+                type="file"
+                accept="application/pdf"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <div className="mb-4">
+                <svg
+                  className="mx-auto h-20 w-20 text-blue-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  />
+                </svg>
+              </div>
+              <p className="text-2xl font-semibold text-gray-700 mb-2">
+                {isExtracting ? "Extracting text..." : "Upload PDF"}
+              </p>
+              <p className="text-base text-gray-500">
+                {isExtracting ? "Please wait while we process your PDF" : "Drop your PDF here or click to browse"}
+              </p>
+              {!isExtracting && (
+                <p className="text-sm text-gray-400 mt-2">
+                  Maximum file size: 50MB
+                </p>
+              )}
+            </label>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col">
+            <div className="mb-3 flex justify-between items-center">
+              <p className="text-sm text-gray-600">
+                {isGenerating ? (
+                  <span className="flex items-center gap-2 font-semibold text-blue-600">
+                    <span className="animate-spin">⏳</span>
+                    Generating question...
+                  </span>
+                ) : (
+                  "📖 Reading your PDF - Questions will appear automatically"
+                )}
+              </p>
+              <button
+                onClick={() => setPdfUrl(null)}
+                className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+              >
+                Upload Different PDF
+              </button>
+            </div>
+            <div className="flex-1 border-2 border-gray-200 rounded-xl shadow-xl overflow-hidden bg-gray-50">
+              <iframe
+                src={pdfUrl}
+                className="w-full h-full"
+                title="PDF Viewer"
+              />
+            </div>
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 };
 

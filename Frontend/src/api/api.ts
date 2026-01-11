@@ -5,12 +5,13 @@ const API = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  timeout: 600000, // 10 minutes timeout
 });
 
 export const generateQuestions = (payload: any) =>
-  API.post("/api/generate", payload);
+  API.post("/api/generate", payload, { timeout: 600000 });
 
 export const generateFromYoutube = (payload: any) =>
-  API.post("/api/transcribe-and-generate", payload);
+  API.post("/api/transcribe-and-generate", payload, { timeout: 600000 });
 
 export default API;

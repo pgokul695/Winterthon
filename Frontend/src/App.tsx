@@ -11,43 +11,87 @@ const App = () => {
   const [currentPage, setCurrentPage] = useState<"pdf" | "video">("pdf");
   const [questions, setQuestions] = useState<any[]>([]);
   const [showOverlay, setShowOverlay] = useState(false);
-  const [text, setText] = useState("");
-  const [scrollPercent, setScrollPercent] = useState(0);
-  const [lastTriggered, setLastTriggered] = useState(0);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  // Trigger question generation when user scrolls past 30% and 70%
+  // Debug effect
   useEffect(() => {
-    if (scrollPercent > 30 && scrollPercent < 100 && Date.now() - lastTriggered > 15000) {
-      handleGenerate();
-      setLastTriggered(Date.now());
-    }
-  }, [scrollPercent]);
+    console.log("State changed - showOverlay:", showOverlay, "questions:", questions);
+  }, [showOverlay, questions]);
 
-  const handleGenerate = async () => {
-    if (!text) return;
-    const res = await generateQuestions({
-      mode: "ollama",
-      model,
-      transcript: text,
-      questionTypes: { MCQ: 1 },
-    });
-    setQuestions(res.data.questions);
-    setShowOverlay(true);
+  // Transform API response to match Question component format
+  const transformQuestion = (apiQuestion: any) => {
+    return {
+      questionText: apiQuestion.questionText,
+      questionType: apiQuestion.questionType,
+      options: apiQuestion.options.map((opt: any) => ({
+        optionText: opt.text,
+        isCorrect: opt.correct,
+        explanation: opt.explanation
+      }))
+    };
   };
 
-  const handleVideoSubmit = async (videoData: { videoUrl: string; startTime?: number; endTime?: number }) => {
-    const res = await generateFromYoutube({
-      ...videoData,
-      mode: "ollama",
-      model,
-      questionTypes: { MCQ: 2 },
-    });
-    setQuestions(res.data.questions);
-    setShowOverlay(true);
+  const handlePDFGenerate = async (pdfText: string) => {
+    if (!pdfText || isGenerating) return;
+    
+    setIsGenerating(true);
+    try {
+      const res = await generateQuestions({
+        mode: "ollama",
+        model,
+        transcript: pdfText,
+        questionTypes: { MCQ: 1 },
+      });
+      console.log("API Response:", res.data);
+      if (res.data.questions && res.data.questions.length > 0) {
+        const transformedQuestions = res.data.questions.map(transformQuestion);
+        console.log("Transformed Questions:", transformedQuestions);
+        setQuestions(transformedQuestions);
+        setShowOverlay(true);
+      }
+    } catch (error) {
+      console.error("Error generating questions:", error);
+      alert("Failed to generate questions. Check if backend is running on port 9006.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleVideoGenerate = async (videoUrl: string, startTime: number, endTime: number) => {
+    if (isGenerating) return;
+    
+    setIsGenerating(true);
+    try {
+      const res = await generateFromYoutube({
+        videoUrl,
+        startTime,
+        endTime,
+        mode: "ollama",
+        model:"gemma:7b",
+        questionTypes: { MCQ: 1 },
+      });
+      console.log("API Response:", res.data);
+      if (res.data.questions && res.data.questions.length > 0) {
+        const transformedQuestions = res.data.questions.map(transformQuestion);
+        console.log("Transformed Questions:", transformedQuestions);
+        setQuestions(transformedQuestions);
+        setShowOverlay(true);
+      }
+    } catch (error) {
+      console.error("Error generating questions:", error);
+      alert("Failed to generate questions. Make sure the backend is running.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleContinue = () => {
+    setShowOverlay(false);
+    setQuestions([]);
   };
 
   return (
-    <>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
       <Navbar
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
@@ -55,29 +99,27 @@ const App = () => {
         setModel={setModel}
       />
 
-      <main className="max-w-5xl mx-auto p-4">
-        {currentPage === "pdf" && (
-          <PDFReader
-            onTextReady={(t) => setText(t)}
-          />
-        )}
-        {currentPage === "video" && <VideoPlayer onSubmit={handleVideoSubmit} />}
-      </main>
-
-      {showOverlay && (
-        <Overlay>
-          {questions.map((q, i) => (
-            <Question key={i} question={q} />
-          ))}
-          <button
-            className="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
-            onClick={() => setShowOverlay(false)}
-          >
-            Continue Reading
-          </button>
-        </Overlay>
+      {currentPage === "pdf" && (
+        <PDFReader 
+          onGenerateQuestions={handlePDFGenerate} 
+          isGenerating={isGenerating}
+        />
       )}
-    </>
+      {currentPage === "video" && (
+        <VideoPlayer 
+          onGenerateQuestions={handleVideoGenerate}
+          isGenerating={isGenerating}
+        />
+      )}
+
+      {console.log("Render check - showOverlay:", showOverlay, "questions.length:", questions.length)}
+      
+      {showOverlay && questions.length > 0 ? (
+        <Overlay>
+          <Question question={questions[0]} onContinue={handleContinue} />
+        </Overlay>
+      ) : null}
+    </div>
   );
 };
 

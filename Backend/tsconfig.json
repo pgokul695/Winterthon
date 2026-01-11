@@ -3,10 +3,13 @@
     "target": "ES2020",
     "module": "CommonJS",
     "outDir": "dist",
+    "rootDir": ".",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "strict": false
+    "strict": false,
+    "resolveJsonModule": true
   },
-  "include": ["server.ts"]
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

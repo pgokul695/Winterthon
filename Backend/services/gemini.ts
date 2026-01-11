@@ -10,18 +10,16 @@ if (GOOGLE_API_KEY) {
 
 export function getGeminiModels(): string[] {
   return [
+    // Gemini 2.5 Series (Latest)
+    "gemini-2.5-flash",      // Gemini 2.5 Flash - RECOMMENDED DEFAULT
+    "gemini-2.5-pro",        // Gemini 2.5 Pro
+    "gemini-2.5-flash-lite", // Gemini 2.5 Flash-Lite
+    
     // Gemini 2.0 Series
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-exp",
-    
-    // Gemini 1.5 Series
-    "gemini-1.5-pro",
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
-    
-    // Latest aliases
-    "gemini-pro",
-    "gemini-flash",
+    "gemini-2.0-flash",      // Gemini 2.0 Flash
+    "gemini-2.0-flash-001",  // Gemini 2.0 Flash 001
+    "gemini-2.0-flash-lite", // Gemini 2.0 Flash-Lite
+    "gemini-2.0-flash-lite-001", // Gemini 2.0 Flash-Lite 001
   ];
 }
 

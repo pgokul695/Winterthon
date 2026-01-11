@@ -1,6 +1,10 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+
+// Load environment variables FIRST before importing any services
+dotenv.config();
+
 import { QuestionRequest, QuestionResponse, GeneratedQuestion, YoutubeQuestionRequest } from "./types";
 import { parseMCQText } from "./utils/parsers";
 import { createQuestionPrompt } from "./utils/prompts";
@@ -8,8 +12,6 @@ import { getOllamaModels, generateWithOllama } from "./services/ollama";
 import { getGeminiModels, generateWithGemini } from "./services/gemini";
 import { saveLog, loadLogs, clearLogs, getLogById } from "./services/logger";
 import { extractVideoId, fetchYoutubeTranscript } from "./services/youtube";
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -186,9 +188,9 @@ app.post("/api/transcribe-and-generate", async (req: Request, res: Response) => 
       return res.status(400).json({ error: "videoUrl is required" });
     }
 
-    // Set defaults
+    // Set defaults based on mode
     const mode = youtubeRequest.mode || "ollama";
-    const model = youtubeRequest.model || "gemma3:latest";
+    const model = youtubeRequest.model || (mode === "gemini" ? "gemini-2.5-flash" : "gemma3:latest");
     const questionTypes = youtubeRequest.questionTypes || { "MCQ": 3 };
     const startTime = youtubeRequest.startTime;
     const endTime = youtubeRequest.endTime;

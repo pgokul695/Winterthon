@@ -188,7 +188,7 @@ app.post("/api/transcribe-and-generate", async (req: Request, res: Response) => 
 
     // Set defaults
     const mode = youtubeRequest.mode || "ollama";
-    const model = youtubeRequest.model || "gemma:latest";
+    const model = youtubeRequest.model || "gemma3:latest";
     const questionTypes = youtubeRequest.questionTypes || { "MCQ": 3 };
     const startTime = youtubeRequest.startTime;
     const endTime = youtubeRequest.endTime;

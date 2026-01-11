@@ -1,6 +1,5 @@
 import { YoutubeTranscript } from 'youtube-transcript';
 import axios from 'axios';
-import ytdl from 'ytdl-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { exec } from 'child_process';
@@ -47,17 +46,23 @@ export function extractVideoId(urlOrId: string): string {
 }
 
 /**
- * Fetch video metadata using ytdl-core
+ * Fetch video metadata using yt-dlp (more reliable)
  */
 async function fetchVideoInfo(videoId: string): Promise<VideoInfo> {
   try {
-    const info = await ytdl.getInfo(videoId);
+    // Use yt-dlp to get video info
+    const { stdout } = await execAsync(
+      `yt-dlp --dump-json --no-warnings "https://www.youtube.com/watch?v=${videoId}"`,
+      { maxBuffer: 10 * 1024 * 1024 }
+    );
+    
+    const info = JSON.parse(stdout);
     
     return {
-      title: info.videoDetails.title || '',
-      description: info.videoDetails.description || '',
-      channelName: info.videoDetails.author.name || '',
-      duration: parseInt(info.videoDetails.lengthSeconds) || 0
+      title: info.title || '',
+      description: info.description || '',
+      channelName: info.uploader || info.channel || '',
+      duration: info.duration || 0
     };
   } catch (error: any) {
     console.error('Error fetching video info:', error.message);
@@ -137,32 +142,16 @@ async function generateCaptionsWithLocalWhisper(videoId: string, startTime?: num
   try {
     console.log(`[YouTube] Downloading audio for transcription...`);
     
-    // Get video info to check duration
-    const info = await ytdl.getInfo(videoId);
-    const videoDuration = parseInt(info.videoDetails.lengthSeconds);
-    
-    // Limit to 10 minutes max for faster processing
-    const maxDuration = 600; // 10 minutes
-    
-    if (videoDuration > 900) {
-      console.log(`[YouTube] Warning: Video is ${Math.floor(videoDuration/60)} minutes long. Limiting transcription to first 10 minutes for speed.`);
+    // Use yt-dlp (system tool) to download audio - more reliable than Node libraries
+    // Extract audio directly to MP3
+    try {
+      await execAsync(
+        `yt-dlp -x --audio-format mp3 --audio-quality 9 -o "${audioPath}" "https://www.youtube.com/watch?v=${videoId}"`,
+        { maxBuffer: 50 * 1024 * 1024 } // 50MB buffer
+      );
+    } catch (dlError: any) {
+      throw new Error(`Failed to download audio: ${dlError.message}`);
     }
-
-    // Download audio stream
-    const audioStream = ytdl(videoId, {
-      quality: 'lowestaudio',
-      filter: 'audioonly',
-    });
-
-    // Save to file
-    const writeStream = fs.createWriteStream(audioPath);
-    audioStream.pipe(writeStream);
-
-    await new Promise((resolve, reject) => {
-      writeStream.on('finish', resolve);
-      writeStream.on('error', reject);
-      audioStream.on('error', reject);
-    });
 
     console.log(`[YouTube] Audio downloaded. Transcribing locally (this may take a minute)...`);
 

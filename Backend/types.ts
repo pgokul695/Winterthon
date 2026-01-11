@@ -23,6 +23,15 @@ export interface QuestionRequest {
   questionTypes: Record<string, number>; // e.g., {"SOL": 2, "SML": 1}
 }
 
+export interface YoutubeQuestionRequest {
+  videoUrl: string;  // YouTube URL or video ID
+  startTime?: number;  // Start time in seconds
+  endTime?: number;    // End time in seconds
+  mode?: "ollama" | "gemini";  // Optional, defaults to "ollama"
+  model?: string;  // Optional, defaults to "gemma:latest"
+  questionTypes?: Record<string, number>;  // Optional, defaults to {"MCQ": 3}
+}
+
 export interface QuestionResponse {
   questions: GeneratedQuestion[];
   totalTime: number;

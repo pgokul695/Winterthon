@@ -1,20 +1,26 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { QuestionRequest, QuestionResponse, GeneratedQuestion } from "./types";
+import { QuestionRequest, QuestionResponse, GeneratedQuestion, YoutubeQuestionRequest } from "./types";
 import { parseMCQText } from "./utils/parsers";
 import { createQuestionPrompt } from "./utils/prompts";
 import { getOllamaModels, generateWithOllama } from "./services/ollama";
 import { getGeminiModels, generateWithGemini } from "./services/gemini";
 import { saveLog, loadLogs, clearLogs, getLogById } from "./services/logger";
+import { extractVideoId, fetchYoutubeTranscript } from "./services/youtube";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
+// CORS configuration - Allow all origins for testing
+app.use(cors({
+  origin: '*',  // Allow all origins
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
 app.use(express.json({ limit: "10mb" }));
 
 // Health check
@@ -30,6 +36,7 @@ app.get("/", (req: Request, res: Response) => {
       logs: "GET /api/logs",
       logById: "GET /api/logs/:id",
       clearLogs: "DELETE /api/logs",
+      transcribeAndGenerate: "POST /api/transcribe-and-generate",
     },
   });
 });
@@ -169,7 +176,163 @@ app.post("/api/generate", async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 });
+//YouTube transcription + question generation
+app.post("/api/transcribe-and-generate", async (req: Request, res: Response) => {
+  try {
+    const youtubeRequest: YoutubeQuestionRequest = req.body;
+    
+    // Validate required field
+    if (!youtubeRequest.videoUrl) {
+      return res.status(400).json({ error: "videoUrl is required" });
+    }
 
+    // Set defaults
+    const mode = youtubeRequest.mode || "ollama";
+    const model = youtubeRequest.model || "gemma:latest";
+    const questionTypes = youtubeRequest.questionTypes || { "MCQ": 3 };
+    const startTime = youtubeRequest.startTime;
+    const endTime = youtubeRequest.endTime;
+
+    console.log(`[YouTube] Extracting transcript from: ${youtubeRequest.videoUrl}`);
+    console.log(`[YouTube] Time range: ${startTime || 0}s - ${endTime || 'end'}s`);
+
+    // Extract video ID
+    let videoId: string;
+    try {
+      videoId = extractVideoId(youtubeRequest.videoUrl);
+      console.log(`[YouTube] Video ID: ${videoId}`);
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    // Fetch transcript
+    let transcript: string;
+    try {
+      transcript = await fetchYoutubeTranscript(videoId, startTime, endTime);
+      console.log(`[YouTube] Transcript fetched: ${transcript.length} characters`);
+    } catch (error: any) {
+      console.error(`[YouTube] Error fetching transcript:`, error.message);
+      return res.status(500).json({ 
+        error: `Failed to fetch YouTube transcript: ${error.message}`,
+        suggestion: "Make sure the video has captions/subtitles available"
+      });
+    }
+
+    // Now generate questions using the same logic as /api/generate
+    const startTimeGen = Date.now();
+    const allQuestions: GeneratedQuestion[] = [];
+    const allPrompts: Array<{
+      questionType: string;
+      prompt: string;
+      response: string;
+      timeTaken: number;
+    }> = [];
+    
+    const logId = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "");
+    const generatedQuestionsText: string[] = [];
+    
+    // Generate questions for each type
+    for (const [questionType, count] of Object.entries(questionTypes)) {
+      if (count <= 0) continue;
+      
+      for (let i = 0; i < count; i++) {
+        try {
+          // Create prompt
+          const prompt = createQuestionPrompt(
+            questionType,
+            transcript,
+            generatedQuestionsText
+          );
+          
+          const qStart = Date.now();
+          let generatedText: string;
+          
+          // Generate based on mode
+          if (mode === "ollama") {
+            generatedText = await generateWithOllama(model, prompt);
+          } else {
+            generatedText = await generateWithGemini(model, prompt);
+          }
+          
+          const qTime = (Date.now() - qStart) / 1000;
+          
+          // Parse the response
+          const parsed = parseMCQText(generatedText);
+          
+          const questionData: GeneratedQuestion = {
+            questionText: parsed.question,
+            options: [
+              { text: parsed.correct, correct: true, explanation: parsed.explanations[0] },
+              { text: parsed.wrong[0], correct: false, explanation: parsed.explanations[1] },
+              { text: parsed.wrong[1], correct: false, explanation: parsed.explanations[2] },
+              { text: parsed.wrong[2], correct: false, explanation: parsed.explanations[3] },
+            ],
+            solution: parsed.correct,
+            questionType,
+            timeTaken: qTime,
+            rawOutput: generatedText,
+            parsedData: parsed,
+          };
+          
+          allQuestions.push(questionData);
+          generatedQuestionsText.push(parsed.question);
+          
+          allPrompts.push({
+            questionType,
+            prompt,
+            response: generatedText,
+            timeTaken: qTime,
+          });
+        } catch (error: any) {
+          console.error(`Error generating question ${i + 1} of type ${questionType}:`, error.message);
+          continue;
+        }
+      }
+    }
+    
+    const totalTime = (Date.now() - startTimeGen) / 1000;
+    
+    // Save log with YouTube metadata
+    const logEntry = {
+      id: logId,
+      timestamp: new Date().toISOString(),
+      mode,
+      model,
+      questionTypes,
+      totalTime,
+      questionsGenerated: allQuestions.length,
+      questions: allQuestions,
+      prompts: allPrompts,
+      transcript: transcript.length > 500 
+        ? transcript.substring(0, 500) + "..."
+        : transcript,
+      youtube: {
+        videoId,
+        videoUrl: youtubeRequest.videoUrl,
+        startTime,
+        endTime,
+        transcriptLength: transcript.length,
+      }
+    };
+    
+    saveLog(logEntry);
+    
+    const response: QuestionResponse = {
+      questions: allQuestions,
+      totalTime,
+      mode,
+      model,
+      logId,
+    };
+    
+    res.json(response);
+  } catch (error: any) {
+    console.error("Error in transcribe-and-generate endpoint:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 
 // Get all logs
 app.get("/api/logs", (req: Request, res: Response) => {
   try {

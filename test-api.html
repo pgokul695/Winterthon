@@ -298,6 +298,35 @@
             font-family: monospace;
             font-size: 12px;
         }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-btn:hover {
+            color: #667eea;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -306,11 +335,18 @@
         <p class="subtitle">Test the Express backend with Ollama and Gemini models</p>
 
         <div class="api-url">
-            <strong>API Endpoint:</strong> <span id="apiUrl">http://localhost:3000</span>
-            <input type="text" id="apiUrlInput" placeholder="http://localhost:3000" style="margin-top: 5px;" value="http://localhost:3000">
+            <strong>API Endpoint:</strong> <span id="apiUrl">http://localhost:9006</span>
+            <input type="text" id="apiUrlInput" placeholder="http://localhost:9006" style="margin-top: 5px;" value="http://localhost:9006">
         </div>
 
-        <form id="questionForm">
+        <!-- Tab Navigation -->
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e0e0e0;">
+            <button type="button" class="tab-btn active" onclick="switchTab('transcript')">📝 Transcript Input</button>
+            <button type="button" class="tab-btn" onclick="switchTab('youtube')">🎥 YouTube Video</button>
+        </div>
+
+        <!-- Transcript Tab -->
+        <form id="questionForm" class="tab-content active" data-tab="transcript">
             <!-- Mode Selection -->
             <div class="form-section">
                 <label>Select AI Mode</label>
@@ -375,6 +411,88 @@
             <button type="submit" class="btn">Generate Questions</button>
         </form>
 
+        <!-- YouTube Tab -->
+        <form id="youtubeForm" class="tab-content" data-tab="youtube" style="display: none;">
+            <!-- YouTube URL -->
+            <div class="form-section">
+                <label for="videoUrl">YouTube Video URL or ID</label>
+                <input type="text" id="videoUrl" placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ or video ID" required>
+                <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                    Accepts: Full URL, short URL (youtu.be), or just the video ID
+                </div>
+            </div>
+
+            <!-- Time Range -->
+            <div class="form-section">
+                <label>Time Range (optional)</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <label for="startTime" style="font-size: 12px; color: #666;">Start Time (seconds)</label>
+                        <input type="number" id="startTime" placeholder="0" min="0">
+                    </div>
+                    <div>
+                        <label for="endTime" style="font-size: 12px; color: #666;">End Time (seconds)</label>
+                        <input type="number" id="endTime" placeholder="Leave empty for full video" min="0">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mode Selection for YouTube -->
+            <div class="form-section">
+                <label>Select AI Mode (defaults to Ollama)</label>
+                <div class="mode-selector">
+                    <div class="mode-option selected" onclick="selectYoutubeMode('ollama')">
+                        <input type="radio" name="youtubeMode" value="ollama" checked>
+                        <div style="font-size: 24px; margin-bottom: 5px;">🦙</div>
+                        <strong>Ollama</strong>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">Local models</div>
+                    </div>
+                    <div class="mode-option" onclick="selectYoutubeMode('gemini')">
+                        <input type="radio" name="youtubeMode" value="gemini">
+                        <div style="font-size: 24px; margin-bottom: 5px;">✨</div>
+                        <strong>Gemini</strong>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">Google AI</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Selection for YouTube -->
+            <div class="form-section">
+                <label for="youtubeModel">Select Model (defaults to gemma:latest)</label>
+                <input type="text" id="youtubeModel" placeholder="gemma:latest" value="gemma:latest">
+            </div>
+
+            <!-- Question Types for YouTube -->
+            <div class="form-section">
+                <label>Question Types (defaults to 3 MCQ)</label>
+                <div class="question-types">
+                    <div class="question-type">
+                        <label>MCQ (Multiple Choice)</label>
+                        <input type="number" id="youtubeMCQ" min="0" max="10" value="3">
+                    </div>
+                    <div class="question-type">
+                        <label>SOL (Simple One-Line)</label>
+                        <input type="number" id="youtubeSOL" min="0" max="10" value="0">
+                    </div>
+                    <div class="question-type">
+                        <label>SML (Short Multi-Line)</label>
+                        <input type="number" id="youtubeSML" min="0" max="10" value="0">
+                    </div>
+                    <div class="question-type">
+                        <label>TF (True/False)</label>
+                        <input type="number" id="youtubeTF" min="0" max="10" value="0">
+                    </div>
+                    <div class="question-type">
+                        <label>FIB (Fill in Blank)</label>
+                        <input type="number" id="youtubeFIB" min="0" max="10" value="0">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Generate Button -->
+            <button type="submit" class="btn">🎥 Transcribe & Generate Questions</button>
+        </form>
+
         <!-- Loading State -->
         <div class="loading" id="loading">
             <div class="spinner"></div>
@@ -393,7 +511,29 @@
 
     <script>
         let currentMode = 'ollama';
-        let apiBaseUrl = 'http://localhost:3000';
+        let currentYoutubeMode = 'ollama';
+        let apiBaseUrl = 'http://localhost:9006';
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.style.display = 'none';
+                content.classList.remove('active');
+            });
+            
+            const activeTab = document.querySelector(`[data-tab="${tabName}"]`);
+            if (activeTab) {
+                activeTab.style.display = 'block';
+                activeTab.classList.add('active');
+            }
+        }
 
         // Update API URL
         document.getElementById('apiUrlInput').addEventListener('change', (e) => {
@@ -401,15 +541,27 @@
             document.getElementById('apiUrl').textContent = apiBaseUrl;
         });
 
-        // Mode selection
+        // Mode selection for transcript tab
         function selectMode(mode) {
             currentMode = mode;
-            document.querySelectorAll('.mode-option').forEach(opt => {
+            const parent = event.target.closest('.mode-selector');
+            parent.querySelectorAll('.mode-option').forEach(opt => {
                 opt.classList.remove('selected');
             });
             event.target.closest('.mode-option').classList.add('selected');
-            document.querySelector(`input[value="${mode}"]`).checked = true;
+            parent.querySelector(`input[value="${mode}"]`).checked = true;
             loadModels();
+        }
+
+        // Mode selection for YouTube tab
+        function selectYoutubeMode(mode) {
+            currentYoutubeMode = mode;
+            const parent = event.target.closest('.mode-selector');
+            parent.querySelectorAll('.mode-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            event.target.closest('.mode-option').classList.add('selected');
+            parent.querySelector(`input[value="${mode}"]`).checked = true;
         }
 
         // Load models based on selected mode
@@ -557,6 +709,67 @@
 
         // Add sample transcript
         const sampleTranscript = `The nervous system is one of the most complex systems in the human body. In 1871, Joseph von Gerlach proposed the reticular theory, which suggested that the nervous system was a single continuous network. However, this theory was later challenged by the neuron doctrine, proposed by Santiago Ramón y Cajal in 1891. The neuron doctrine stated that the nervous system is made up of discrete individual cells called neurons. This groundbreaking theory revolutionized our understanding of the brain and nervous system, and Cajal was awarded the Nobel Prize in Physiology or Medicine in 1906 for his work.`;
+
+        // Handle YouTube form submission
+        document.getElementById('youtubeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Gather form data
+            const videoUrl = document.getElementById('videoUrl').value;
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            const mode = document.querySelector('input[name="youtubeMode"]:checked').value;
+            const model = document.getElementById('youtubeModel').value || 'gemma:latest';
+            
+            const questionTypes = {};
+            ['youtubeMCQ', 'youtubeSOL', 'youtubeSML', 'youtubeTF', 'youtubeFIB'].forEach(id => {
+                const type = id.replace('youtube', '');
+                const count = parseInt(document.getElementById(id).value) || 0;
+                if (count > 0) {
+                    questionTypes[type] = count;
+                }
+            });
+
+            // Build request body
+            const requestBody = { videoUrl };
+            if (startTime) requestBody.startTime = parseInt(startTime);
+            if (endTime) requestBody.endTime = parseInt(endTime);
+            if (mode) requestBody.mode = mode;
+            if (model) requestBody.model = model;
+            if (Object.keys(questionTypes).length > 0) {
+                requestBody.questionTypes = questionTypes;
+            }
+
+            // Show loading
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('results').classList.remove('active');
+            document.getElementById('error').classList.remove('active');
+            const submitBtn = document.querySelector('#youtubeForm .btn');
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${apiBaseUrl}/api/transcribe-and-generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to transcribe and generate questions');
+                }
+
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                showError(`Error: ${error.message}`);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+                submitBtn.disabled = false;
+            }
+        });
 
         // Add a button to load sample
         const transcriptArea = document.getElementById('transcript');

@@ -13,6 +13,16 @@ import { getGeminiModels, generateWithGemini } from "./services/gemini";
 import { saveLog, loadLogs, clearLogs, getLogById } from "./services/logger";
 import { extractVideoId, fetchYoutubeTranscript } from "./services/youtube";
 
+// Shuffle array helper
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -90,16 +100,17 @@ app.post("/api/generate", async (req: Request, res: Response) => {
       if (count <= 0) continue;
       
       for (let i = 0; i < count; i++) {
+        const qStart = Date.now();
+        let generatedText: string = '';
+        let prompt: string = '';
+        
         try {
           // Create prompt
-          const prompt = createQuestionPrompt(
+          prompt = createQuestionPrompt(
             questionType,
             request.transcript,
             generatedQuestionsText
           );
-          
-          const qStart = Date.now();
-          let generatedText: string;
           
           // Generate based on mode
           if (request.mode === "ollama") {
@@ -113,14 +124,17 @@ app.post("/api/generate", async (req: Request, res: Response) => {
           // Parse the response
           const parsed = parseMCQText(generatedText);
           
+          // Create options array and shuffle
+          const options = shuffleArray([
+            { text: parsed.correct, correct: true, explanation: parsed.explanations[0] },
+            { text: parsed.wrong[0], correct: false, explanation: parsed.explanations[1] },
+            { text: parsed.wrong[1], correct: false, explanation: parsed.explanations[2] },
+            { text: parsed.wrong[2], correct: false, explanation: parsed.explanations[3] },
+          ]);
+          
           const questionData: GeneratedQuestion = {
             questionText: parsed.question,
-            options: [
-              { text: parsed.correct, correct: true, explanation: parsed.explanations[0] },
-              { text: parsed.wrong[0], correct: false, explanation: parsed.explanations[1] },
-              { text: parsed.wrong[1], correct: false, explanation: parsed.explanations[2] },
-              { text: parsed.wrong[2], correct: false, explanation: parsed.explanations[3] },
-            ],
+            options,
             solution: parsed.correct,
             questionType,
             timeTaken: qTime,
@@ -139,6 +153,20 @@ app.post("/api/generate", async (req: Request, res: Response) => {
           });
         } catch (error: any) {
           console.error(`Error generating question ${i + 1} of type ${questionType}:`, error.message);
+          
+          // Log raw output for debugging
+          if (generatedText) {
+            console.error(`\n=== RAW OUTPUT THAT FAILED ===`);
+            console.error(generatedText);
+            console.error(`=== END RAW OUTPUT ===\n`);
+            
+            allPrompts.push({
+              questionType,
+              prompt,
+              response: `ERROR: ${error.message}\n\nRaw output:\n${generatedText}`,
+              timeTaken: (Date.now() - qStart) / 1000,
+            });
+          }
           continue;
         }
       }
@@ -238,16 +266,17 @@ app.post("/api/transcribe-and-generate", async (req: Request, res: Response) => 
       if (count <= 0) continue;
       
       for (let i = 0; i < count; i++) {
+        const qStart = Date.now();
+        let generatedText: string = '';
+        let prompt: string = '';
+        
         try {
           // Create prompt
-          const prompt = createQuestionPrompt(
+          prompt = createQuestionPrompt(
             questionType,
             transcript,
             generatedQuestionsText
           );
-          
-          const qStart = Date.now();
-          let generatedText: string;
           
           // Generate based on mode
           if (mode === "ollama") {
@@ -261,14 +290,17 @@ app.post("/api/transcribe-and-generate", async (req: Request, res: Response) => 
           // Parse the response
           const parsed = parseMCQText(generatedText);
           
+          // Create options array and shuffle
+          const options = shuffleArray([
+            { text: parsed.correct, correct: true, explanation: parsed.explanations[0] },
+            { text: parsed.wrong[0], correct: false, explanation: parsed.explanations[1] },
+            { text: parsed.wrong[1], correct: false, explanation: parsed.explanations[2] },
+            { text: parsed.wrong[2], correct: false, explanation: parsed.explanations[3] },
+          ]);
+          
           const questionData: GeneratedQuestion = {
             questionText: parsed.question,
-            options: [
-              { text: parsed.correct, correct: true, explanation: parsed.explanations[0] },
-              { text: parsed.wrong[0], correct: false, explanation: parsed.explanations[1] },
-              { text: parsed.wrong[1], correct: false, explanation: parsed.explanations[2] },
-              { text: parsed.wrong[2], correct: false, explanation: parsed.explanations[3] },
-            ],
+            options,
             solution: parsed.correct,
             questionType,
             timeTaken: qTime,
@@ -287,6 +319,19 @@ app.post("/api/transcribe-and-generate", async (req: Request, res: Response) => 
           });
         } catch (error: any) {
           console.error(`Error generating question ${i + 1} of type ${questionType}:`, error.message);
+          
+          // Save failed prompt for debugging
+          try {
+            if (typeof generatedText !== 'undefined') {
+              console.error(`Raw output that failed to parse:\n${generatedText}`);
+              allPrompts.push({
+                questionType,
+                prompt,
+                response: `ERROR: ${error.message}\n\nRaw output:\n${generatedText}`,
+                timeTaken: (Date.now() - qStart) / 1000,
+              });
+            }
+          } catch {}
           continue;
         }
       }

@@ -8,7 +8,7 @@ export function createQuestionPrompt(
 ): string {
   let baseText = `===== TEXT TO CREATE QUESTION FROM =====
 ${transcriptContent}
-===== END OF TEXT =====
+===== END OF TEXT (Do not use anything below to generate questions from) =====
 
 `;
 
@@ -47,40 +47,15 @@ WRONG 1: [Why first option is wrong]
 WRONG 2: [Why second option is wrong]
 WRONG 3: [Why third option is wrong]
 
-CRITICAL RULES:
-- You MUST provide exactly THREE wrong answers after "WRONG:"
-- Each wrong answer goes on its own line with NO prefixes (no WRONG 1:, WRONG 2:, WRONG 3:)
-- After "EXPLANATIONS:" you MUST use the labels CORRECT:, WRONG 1:, WRONG 2:, WRONG 3:
+Important rules:
+- After "WRONG:" write THREE options on separate lines (no WRONG 1:, WRONG 2: labels)
+- After "EXPLANATIONS:" you can use CORRECT: and WRONG 1:, WRONG 2:, WRONG 3: labels
 - Keep all answer options SHORT (2-5 words only)
 - Do NOT use A/B/C/D or 1/2/3/4 prefixes on answers
 - Do NOT use markdown formatting
 - Question must be answerable from the text above
 
-
 Generate now:`,
-
-    SML: `${baseText}${prevQuestionsText}Create a MULTIPLE-CORRECT multiple choice question. 2-3 answers are correct.
-
-OUTPUT FORMAT:
-QUESTION:
-[write your question here]
-
-CORRECT:
-[write first correct answer - no prefix]
-[write second correct answer - no prefix]
-[optionally write third correct answer - no prefix]
-
-WRONG:
-[write first wrong answer - no prefix]
-[write second wrong answer - no prefix]
-
-EXPLANATIONS:
-CORRECT 1: [explain why this is correct]
-CORRECT 2: [explain why this is correct]
-WRONG 1: [explain why this is wrong]
-WRONG 2: [explain why this is wrong]
-
-Generate the question:`,
 
     MCQ: `${baseText}${prevQuestionsText}Create a quiz question about the text above. Follow this exact structure:
 
@@ -111,17 +86,40 @@ Important rules:
 
 Generate now:`,
 
+    SML: `${baseText}${prevQuestionsText}Create a MULTIPLE-CORRECT multiple choice question. 2-3 answers are correct.
+
+OUTPUT FORMAT:
+QUESTION:
+Write your question here
+
+CORRECT:
+Write first correct answer
+Write second correct answer
+Optionally write third correct answer
+
+WRONG:
+Write first wrong answer
+Write second wrong answer
+
+EXPLANATIONS:
+CORRECT 1: Explain why this is correct
+CORRECT 2: Explain why this is correct
+WRONG 1: Explain why this is wrong
+WRONG 2: Explain why this is wrong
+
+Generate the question:`,
+
     TF: `${baseText}${prevQuestionsText}Create a TRUE/FALSE question.
 
 OUTPUT FORMAT:
 QUESTION:
-[write a statement that is either true or false]
+Write a statement that is either true or false
 
 CORRECT:
-[True or False]
+True or False
 
 EXPLANATION:
-[explain why this is true or false based on the text]
+Explain why this is true or false based on the text
 
 Generate the question:`,
 
@@ -129,13 +127,13 @@ Generate the question:`,
 
 OUTPUT FORMAT:
 QUESTION:
-[write question with _____ where the answer should go]
+Write question with _____ where the answer should go
 
 CORRECT:
-[write the word/phrase that fills the blank]
+Write the word or phrase that fills the blank
 
 EXPLANATION:
-[explain why this is the correct answer]
+Explain why this is the correct answer
 
 Generate the question:`,
 
@@ -143,13 +141,13 @@ Generate the question:`,
 
 OUTPUT FORMAT:
 QUESTION:
-[write your question]
+Write your question
 
 CORRECT:
-[write the numeric answer]
+Write the numeric answer
 
 EXPLANATION:
-[explain why this is the correct value]
+Explain why this is the correct value
 
 Generate the question:`,
 
@@ -157,10 +155,10 @@ Generate the question:`,
 
 OUTPUT FORMAT:
 QUESTION:
-[write open-ended question]
+Write open-ended question
 
 SOLUTION:
-[write detailed 2-3 sentence answer]
+Write detailed 2-3 sentence answer
 
 Generate the question:`
   };

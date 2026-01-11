@@ -27,12 +27,15 @@ export function parseMCQText(text: string): ParsedMCQ {
   text = text.replace(/```[^\n]*\n/g, '');
   text = text.replace(/```/g, '');
   
-  // Helper to strip common prefixes from options (A., 1., *, etc.)
+  // Helper to strip common prefixes and markdown from options
   function stripPrefix(line: string): string {
     line = line.replace(/^[A-D]\.\s*/i, '');  // Remove A., B., C., D.
     line = line.replace(/^\d+\.\s*/, '');     // Remove 1., 2., 3.
-    line = line.replace(/^\*+\s*/, '');       // Remove * or **
-    line = line.replace(/\*\*/g, '');         // Remove markdown bold
+    line = line.replace(/^\*+\s*/, '');       // Remove leading * or **
+    line = line.replace(/\*\*/g, '');         // Remove markdown bold **text**
+    line = line.replace(/\*([^\*]+)\*/g, '$1');  // Remove markdown italic *text*
+    line = line.replace(/`([^`]+)`/g, '$1');  // Remove inline code `text`
+    line = line.replace(/^[-•]\s*/, '');      // Remove bullet points
     return line.trim();
   }
   
@@ -61,14 +64,26 @@ export function parseMCQText(text: string): ParsedMCQ {
   if (!questionText) {
     throw new Error("Could not find QUESTION section in text");
   }
-  const question = stripPrefix(questionText.split('\n')[0].trim());
+  // Take all non-empty lines and join them (handles multi-line questions)
+  const question = questionText
+    .split('\n')
+    .map(line => stripPrefix(line.trim()))
+    .filter(line => line.length > 0)
+    .join(' ')
+    .trim();
   
   // Extract correct answer
   const correctText = extractSection('CORRECT:', 'WRONG');
   if (!correctText) {
     throw new Error("Could not find CORRECT section in text");
   }
-  const correct = stripPrefix(correctText.split('\n')[0].trim());
+  // Take all non-empty lines and join them
+  const correct = correctText
+    .split('\n')
+    .map(line => stripPrefix(line.trim()))
+    .filter(line => line.length > 0)
+    .join(' ')
+    .trim();
   
   // Extract wrong answers - handle both "WRONG:" and "WRONG 1:" formats
   let wrongStartIdx = -1;
@@ -140,42 +155,27 @@ export function parseMCQText(text: string): ParsedMCQ {
   
   const expSection = extractSection('EXPLANATIONS:', undefined);
   if (expSection) {
-    const expLines: string[] = [];
-    let currentExp = '';
+    // Split by explanation markers - they might be on same line or different lines
+    // Use regex to find all CORRECT: and WRONG N: markers
+    const expMatches = expSection.match(/(CORRECT|WRONG\s+\d+):\s*([^]*?)(?=(CORRECT|WRONG\s+\d+):|$)/gi);
     
-    for (const line of expSection.split('\n')) {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) {
-        continue;
+    if (expMatches && expMatches.length > 0) {
+      const expLines: string[] = [];
+      
+      for (const match of expMatches) {
+        // Extract just the explanation text (remove the CORRECT: or WRONG N: prefix)
+        const cleaned = match.replace(/^(CORRECT|WRONG\s+\d+):\s*/i, '').trim();
+        if (cleaned) {
+          expLines.push(stripPrefix(cleaned));
+        }
       }
       
-      // Check if this is a new explanation marker
-      if (/^(CORRECT|WRONG\s+\d+):/i.test(trimmedLine)) {
-        if (currentExp) {
-          expLines.push(currentExp);
-        }
-        // Extract the explanation after the marker
-        currentExp = trimmedLine.replace(/^(CORRECT|WRONG\s+\d+):\s*/i, '').trim();
-      } else {
-        // Continuation of previous explanation
-        if (currentExp) {
-          currentExp += ' ' + trimmedLine;
-        } else {
-          currentExp = trimmedLine;
-        }
-      }
+      // Map explanations to our array (ensure we have exactly 4)
+      if (expLines.length >= 1) explanations[0] = expLines[0];
+      if (expLines.length >= 2) explanations[1] = expLines[1];
+      if (expLines.length >= 3) explanations[2] = expLines[2];
+      if (expLines.length >= 4) explanations[3] = expLines[3];
     }
-    
-    // Add the last explanation
-    if (currentExp) {
-      expLines.push(currentExp);
-    }
-    
-    // Map explanations to our array
-    if (expLines.length >= 1) explanations[0] = expLines[0];
-    if (expLines.length >= 2) explanations[1] = expLines[1];
-    if (expLines.length >= 3) explanations[2] = expLines[2];
-    if (expLines.length >= 4) explanations[3] = expLines[3];
   }
   
   return {

@@ -156,17 +156,17 @@ Frontend will start on `http://localhost:5173`
 
 ### AI Models
 
+**Google Gemini (Cloud - API Key Required) ⭐ Recommended**
+- `gemini-2.5-flash` - **Default & Recommended** - Fast, efficient, high quality
+- `gemini-pro` - Premium quality for complex content
+- `gemini-1.5-flash` - Balanced performance
+
 **Ollama (Local - Free)**
-- `gemma3:latest` - Fast, recommended for speed
+- `gemma3:latest` - Fast, local alternative
 - `gemma:7b` - High quality output
 - `gemma3:2b` - Quick generation
 - `llama2` - Alternative option
 - `mistral` - Alternative option
-
-**Google Gemini (Cloud - API Key Required)**
-- `gemini-2.5-flash` - Fast and efficient
-- `gemini-pro` - High quality
-- `gemini-1.5-flash` - Balanced performance
 
 ### Environment Variables
 

@@ -286,17 +286,17 @@ Backend/
 
 ### Supported AI Models
 
+**Gemini (Cloud) ⭐ Recommended:**
+- `gemini-2.5-flash` - **Default & Recommended** - Fast, efficient, excellent quality
+- `gemini-pro` - Premium quality for complex educational content
+- `gemini-1.5-flash` - Balanced performance
+
 **Ollama (Local):**
-- `gemma3:latest` - Recommended for speed
+- `gemma3:latest` - Fast local alternative
 - `gemma:7b` - Better quality
 - `gemma3:2b` - Quick output
 - `llama2` - Alternative model
 - `mistral` - Alternative model
-
-**Gemini (Cloud):**
-- `gemini-2.5-flash` - Fast and efficient
-- `gemini-pro` - High quality
-- `gemini-1.5-flash` - Balanced
 
 ## 🎯 Question Types Explained
 

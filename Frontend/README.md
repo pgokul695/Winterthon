@@ -112,8 +112,8 @@ Frontend/
 1. Navigate to the text input section
 2. Paste your lecture transcript or notes
 3. Configure question settings:
-   - Select AI mode (Ollama/Gemini)
-   - Choose model (gemma3:latest recommended)
+   - Select AI mode (Gemini recommended for best quality)
+   - Choose model (gemini-2.5-flash is default and recommended)
    - Set question types and counts
 4. Click "Generate Questions"
 5. Take the quiz or review questions

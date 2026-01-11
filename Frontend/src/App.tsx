@@ -7,7 +7,7 @@ import Question from "./components/quiz/Question";
 import { generateQuestions, generateFromYoutube } from "./api/api";
 
 const App = () => {
-  const [model, setModel] = useState("gemma3:latest");
+  const [model, setModel] = useState("gemini-2.5-flash");
   const [currentPage, setCurrentPage] = useState<"pdf" | "video">("pdf");
   const [questions, setQuestions] = useState<any[]>([]);
   const [showOverlay, setShowOverlay] = useState(false);
@@ -37,7 +37,7 @@ const App = () => {
     setIsGenerating(true);
     try {
       const res = await generateQuestions({
-        mode: "ollama",
+        mode: "gemini",
         model,
         transcript: pdfText,
         questionTypes: { MCQ: 1 },
@@ -66,8 +66,8 @@ const App = () => {
         videoUrl,
         startTime,
         endTime,
-        mode: "ollama",
-        model:"gemma:7b",
+        mode: "gemini",
+        model: "gemini-2.5-flash",
         questionTypes: { MCQ: 1 },
       });
       console.log("API Response:", res.data);

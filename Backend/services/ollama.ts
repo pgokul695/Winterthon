@@ -25,7 +25,7 @@ export async function generateWithOllama(
         stream: false,
         options: {
           temperature: 0.2,
-          num_predict: 1024,
+          num_predict: 2048, // Increased from 1024 to allow longer completions
         },
       },
       { timeout: 180000 }

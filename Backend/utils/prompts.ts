@@ -47,13 +47,15 @@ WRONG 1: [Why first option is wrong]
 WRONG 2: [Why second option is wrong]
 WRONG 3: [Why third option is wrong]
 
-Important rules:
-- After "WRONG:" write THREE options on separate lines (no WRONG 1:, WRONG 2: labels)
-- After "EXPLANATIONS:" you can use CORRECT: and WRONG 1:, WRONG 2:, WRONG 3: labels
+CRITICAL RULES:
+- You MUST provide exactly THREE wrong answers after "WRONG:"
+- Each wrong answer goes on its own line with NO prefixes (no WRONG 1:, WRONG 2:, WRONG 3:)
+- After "EXPLANATIONS:" you MUST use the labels CORRECT:, WRONG 1:, WRONG 2:, WRONG 3:
 - Keep all answer options SHORT (2-5 words only)
 - Do NOT use A/B/C/D or 1/2/3/4 prefixes on answers
 - Do NOT use markdown formatting
 - Question must be answerable from the text above
+
 
 Generate now:`,
 

@@ -50,9 +50,11 @@ export function extractVideoId(urlOrId: string): string {
  */
 async function fetchVideoInfo(videoId: string): Promise<VideoInfo> {
   try {
-    // Use yt-dlp to get video info
+    // Use yt-dlp to get video info with Android client
     const { stdout } = await execAsync(
-      `yt-dlp --dump-json --no-warnings "https://www.youtube.com/watch?v=${videoId}"`,
+      `yt-dlp --dump-json --no-warnings ` +
+      `--extractor-args "youtube:player_client=android" ` +
+      `"https://www.youtube.com/watch?v=${videoId}"`,
       { maxBuffer: 10 * 1024 * 1024 }
     );
     
@@ -144,9 +146,16 @@ async function generateCaptionsWithLocalWhisper(videoId: string, startTime?: num
     
     // Use yt-dlp (system tool) to download audio - more reliable than Node libraries
     // Extract audio directly to MP3
+    // Adding flags to avoid bot detection:
+    // --no-check-certificates: bypass SSL verification
+    // --user-agent: mimic real browser
+    // --extractor-args "youtube:player_client=android": use Android client (more reliable)
     try {
       await execAsync(
-        `yt-dlp -x --audio-format mp3 --audio-quality 9 -o "${audioPath}" "https://www.youtube.com/watch?v=${videoId}"`,
+        `yt-dlp -x --audio-format mp3 --audio-quality 9 ` +
+        `--extractor-args "youtube:player_client=android" ` +
+        `--user-agent "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36" ` +
+        `-o "${audioPath}" "https://www.youtube.com/watch?v=${videoId}"`,
         { maxBuffer: 50 * 1024 * 1024 } // 50MB buffer
       );
     } catch (dlError: any) {
